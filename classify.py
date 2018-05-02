@@ -7,7 +7,7 @@ from temporal_transforms import LoopPadding
 
 def classify_video(video_dir, video_name, class_names, model, opt):
     assert opt.mode in ['score', 'feature']
-
+    print('video_name, class_names', video_name)
     spatial_transform = Compose([Scale(opt.sample_size),
                                  CenterCrop(opt.sample_size),
                                  ToTensor(),
@@ -21,32 +21,41 @@ def classify_video(video_dir, video_name, class_names, model, opt):
 
     video_outputs = []
     video_segments = []
+    print('Running on video', video_dir)
+
+    #print ('Data loader size', len(data_loader))
     for i, (inputs, segments) in enumerate(data_loader):
         inputs = Variable(inputs, volatile=True)
+        print(i, inputs.size(), segments.shape)
         outputs = model(inputs)
 
         video_outputs.append(outputs.cpu().data)
         video_segments.append(segments)
 
-    video_outputs = torch.cat(video_outputs)
-    video_segments = torch.cat(video_segments)
+    #print('Video outputs and segments', video_outputs)
     results = {
         'video': video_name,
         'clips': []
     }
+    if len(video_outputs)>0:
+        print('Video outputs and segments: ', video_outputs[0].shape)
 
-    _, max_indices = video_outputs.max(dim=1)
-    for i in range(video_outputs.size(0)):
-        clip_results = {
-            'segment': video_segments[i].tolist(),
-        }
+        video_outputs = torch.cat(video_outputs)
+        video_segments = torch.cat(video_segments)
 
-        if opt.mode == 'score':
-            clip_results['label'] = class_names[max_indices[i]]
-            clip_results['scores'] = video_outputs[i].tolist()
-        elif opt.mode == 'feature':
-            clip_results['features'] = video_outputs[i].tolist()
+        _, max_indices = video_outputs.max(dim=1)
+        print('Video outputs', video_outputs.size())
+        for i in range(video_outputs.size(0)):
+            clip_results = {
+                'segment': video_segments[i].tolist(),
+            }
 
-        results['clips'].append(clip_results)
+            if opt.mode == 'score':
+                clip_results['label'] = class_names[max_indices[i]]
+                clip_results['scores'] = video_outputs[i].tolist()
+            elif opt.mode == 'feature':
+                clip_results['features'] = video_outputs[i].tolist()
+
+            results['clips'].append(clip_results)
 
     return results
